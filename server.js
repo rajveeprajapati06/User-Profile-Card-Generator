@@ -1,0 +1,244 @@
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+
+const PORT = process.env.PORT || 5012;
+const PUBLIC_DIR = path.join(__dirname, "public");
+
+const palettes = {
+  aurora: {
+    label: "Aurora",
+    accent: "#00b894",
+    ink: "#10201b",
+    soft: "#e2fbf4",
+    glow: "rgba(0, 184, 148, 0.28)"
+  },
+  ember: {
+    label: "Ember",
+    accent: "#e85d3f",
+    ink: "#241614",
+    soft: "#fff0ea",
+    glow: "rgba(232, 93, 63, 0.26)"
+  },
+  ocean: {
+    label: "Ocean",
+    accent: "#2878ff",
+    ink: "#101827",
+    soft: "#eaf2ff",
+    glow: "rgba(40, 120, 255, 0.24)"
+  },
+  plum: {
+    label: "Plum",
+    accent: "#8f4de8",
+    ink: "#211629",
+    soft: "#f7edff",
+    glow: "rgba(143, 77, 232, 0.22)"
+  }
+};
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json",
+    "Cache-Control": "no-store"
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 1_000_000) {
+        reject(new Error("Request body is too large."));
+        req.destroy();
+      }
+    });
+
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+function isValidImageUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function getInitials(name) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+}
+
+function normalizeSkills(value) {
+  return String(value || "")
+    .split(",")
+    .map((skill) => skill.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function buildTagline(role, vibe) {
+  const roleText = role || "Creative Builder";
+  const vibeText = vibe || "Curious";
+  return `${vibeText} ${roleText}`;
+}
+
+function buildProfileCard(profile) {
+  const palette = palettes[profile.palette] || palettes.aurora;
+  const skills = profile.skills.map((skill) => `<span>${escapeHtml(skill)}</span>`).join("");
+
+  return `
+    <article class="profile-card" style="--accent:${palette.accent};--ink:${palette.ink};--soft:${palette.soft};--glow:${palette.glow};">
+      <div class="card-ribbon"></div>
+      <div class="card-main">
+        <div class="avatar-frame" data-initials="${escapeHtml(profile.initials)}">
+          <img src="${escapeHtml(profile.imageUrl)}" alt="${escapeHtml(profile.name)} profile portrait" loading="lazy">
+          <strong>${escapeHtml(profile.initials)}</strong>
+        </div>
+
+        <div class="card-copy">
+          <p class="card-kicker">${escapeHtml(profile.tagline)}</p>
+          <h2>${escapeHtml(profile.name)}</h2>
+          <p class="role">${escapeHtml(profile.role)}</p>
+          <p class="bio">${escapeHtml(profile.bio)}</p>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="skill-row">${skills}</div>
+        <div class="mini-stats">
+          <span><b>${profile.skills.length}</b> Skills</span>
+          <span><b>${palette.label}</b> Palette</span>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+async function handleProfilePost(req, res) {
+  try {
+    const body = await readBody(req);
+    const data = JSON.parse(body || "{}");
+    const name = String(data.name || "").trim();
+    const role = String(data.role || "").trim();
+    const bio = String(data.bio || "").trim();
+    const imageUrl = String(data.imageUrl || "").trim();
+    const vibe = String(data.vibe || "").trim();
+    const palette = palettes[data.palette] ? data.palette : "aurora";
+    const skills = normalizeSkills(data.skills);
+
+    if (name.length < 2) {
+      return sendJson(res, 400, { success: false, message: "Name must be at least 2 characters." });
+    }
+
+    if (role.length < 2) {
+      return sendJson(res, 400, { success: false, message: "Role must be at least 2 characters." });
+    }
+
+    if (bio.length < 20) {
+      return sendJson(res, 400, { success: false, message: "Bio must be at least 20 characters." });
+    }
+
+    if (!isValidImageUrl(imageUrl)) {
+      return sendJson(res, 400, { success: false, message: "Image URL must be a valid http or https URL." });
+    }
+
+    if (skills.length === 0) {
+      return sendJson(res, 400, { success: false, message: "Add at least one skill." });
+    }
+
+    const profile = {
+      name,
+      role,
+      bio,
+      imageUrl,
+      vibe,
+      palette,
+      skills,
+      initials: getInitials(name),
+      tagline: buildTagline(role, vibe)
+    };
+
+    return sendJson(res, 201, {
+      success: true,
+      message: "Profile studio card generated by the backend.",
+      profile,
+      cardHtml: buildProfileCard(profile)
+    });
+  } catch (error) {
+    return sendJson(res, 400, {
+      success: false,
+      message: "Invalid POST body.",
+      details: error.message
+    });
+  }
+}
+
+function serveStatic(req, res) {
+  const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+  const requestedPath = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
+  const filePath = path.normalize(path.join(PUBLIC_DIR, requestedPath));
+
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    return sendJson(res, 403, { success: false, message: "Forbidden path." });
+  }
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      return sendJson(res, 404, { success: false, message: "Page not found." });
+    }
+
+    const contentTypes = {
+      ".html": "text/html",
+      ".css": "text/css",
+      ".js": "application/javascript"
+    };
+
+    res.writeHead(200, { "Content-Type": contentTypes[path.extname(filePath)] || "text/plain" });
+    res.end(content);
+  });
+}
+
+const server = http.createServer((req, res) => {
+  if (req.method === "POST" && req.url === "/api/profile") {
+    return handleProfilePost(req, res);
+  }
+
+  if (req.url.startsWith("/api/")) {
+    return sendJson(res, 404, { success: false, message: "API route not found." });
+  }
+
+  return serveStatic(req, res);
+});
+
+server.listen(PORT, () => {
+  console.log(`VirtualWorks Task 2 Profile Studio running at http://localhost:${PORT}`);
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use. Stop the old server or run: PORT=5013 npm start`);
+    process.exit(1);
+  }
+
+  throw error;
+});

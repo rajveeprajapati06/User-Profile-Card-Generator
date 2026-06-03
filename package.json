@@ -1,0 +1,18 @@
+{
+  "name": "virtualworks-task-2-profile-studio",
+  "version": "1.0.0",
+  "description": "Creative form-based profile studio demonstrating POST requests between frontend and backend.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "node",
+    "post-request",
+    "form",
+    "profile-card",
+    "creative-ui"
+  ],
+  "author": "",
+  "license": "ISC"
+}

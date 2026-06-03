@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VirtualWorks Task 2 | Profile Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="studio">
+    <section class="composer">
+      <div class="brand-row">
+        <span>VW</span>
+        <div>
+          <h1>Profile Studio</h1>
+        </div>
+      </div>
+
+      <form id="profileForm">
+        <div class="field-grid">
+          <label>
+            Name
+            <input name="name" type="text" value="Rajvee Sharma" required>
+          </label>
+
+          <label>
+            Role
+            <input name="role" type="text" value="Frontend Developer" required>
+          </label>
+        </div>
+
+        <label>
+          Bio
+          <textarea name="bio" rows="5" required>I create clean, practical web interfaces and enjoy connecting frontend details with backend logic.</textarea>
+        </label>
+
+        <label>
+          Image URL
+          <input name="imageUrl" type="url" value="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=900&auto=format&fit=crop" required>
+        </label>
+
+        <div class="field-grid">
+          <label>
+            Vibe
+            <select name="vibe">
+              <option>Focused</option>
+              <option>Inventive</option>
+              <option>Bold</option>
+              <option>Calm</option>
+            </select>
+          </label>
+
+          <label>
+            Palette
+            <select name="palette">
+              <option value="aurora">Aurora</option>
+              <option value="ember">Ember</option>
+              <option value="ocean">Ocean</option>
+              <option value="plum">Plum</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Skills
+          <input name="skills" type="text" value="HTML, CSS, JavaScript, Node.js" required>
+        </label>
+
+        <button type="submit">Generate Card</button>
+      </form>
+
+      <p id="message" class="message">The form sends JSON to the backend using a POST request.</p>
+    </section>
+
+    <section class="stage">
+      <div class="stage-header">
+        <div>
+          <p>Backend Response</p>
+          <h2>Formatted Profile Card</h2>
+        </div>
+        <div class="stage-actions">
+          <span id="statusBadge">Idle</span>
+          <button id="downloadButton" class="download-button" type="button" disabled>Download</button>
+        </div>
+      </div>
+
+      <div id="preview" class="preview-empty">
+        Submit the form to generate a profile card.
+      </div>
+
+      <pre id="jsonOutput" class="json-output">{ "waiting": true }</pre>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
